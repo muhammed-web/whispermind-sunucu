@@ -26,7 +26,7 @@ app.post("/summarize", upload.single("audio"), async (req, res) => {
     console.log("📩 Ses dosyası alındı! Boyut:", req.file.size, "byte");
 
     // Modeli seç (Gemini 2.0 Flash)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // DİKKAT: Flutter'dan gelen ses bazen isimsiz oluyor.
     // Google'ın anlaması için "audio/mp4" olduğunu elle belirtiyoruz.
@@ -63,3 +63,4 @@ const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Mutfak (Sunucu) Hazır: http://localhost:${PORT}`);
 });
+
