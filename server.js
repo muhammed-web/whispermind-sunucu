@@ -29,7 +29,7 @@ app.post("/summarize", upload.single("audio"), async (req, res) => {
     console.log("📂 Dosya Tipi:", req.file.mimetype); // Loglarda tipi görelim
 
     // Modeli seç (Gemini 1.5 Flash - Ücretsiz ve Hızlı)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Dosya tipini (PDF mi Ses mi?) otomatik algıla
     // Eğer Flutter doğru mimetype göndermiyorsa varsayılanı ayarla
@@ -77,3 +77,4 @@ const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Mutfak (Sunucu) Hazır: http://localhost:${PORT}`);
 });
+
