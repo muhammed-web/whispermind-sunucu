@@ -34,7 +34,7 @@ app.post("/summarize", upload.single("audio"), async (req, res) => {
     const base64Data = req.file.buffer.toString("base64");
 
     // İŞTE ÇÖZÜM BURADA: Listende var olan modeli seçtik!
-    const modelName = "gemini-2.0-flash"; 
+    const modelName = "gemini-flash-latest"; 
     
     console.log(`🚀 ${modelName} modeline bağlanılıyor...`);
 
@@ -88,3 +88,4 @@ const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Sunucu Hazır: http://localhost:${PORT}`);
 });
+
