@@ -1,6 +1,5 @@
 const express = require("express");
 const multer = require("multer");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const dotenv = require("dotenv");
 const cors = require("cors");
 
@@ -9,82 +8,83 @@ dotenv.config();
 const app = express();
 app.use(cors());
 
-// Dosyaları geçici hafızada tut
+// Dosyaları hafızada tut
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Google AI Bağlantısı
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// Dosya yükleme alanı
 app.post("/summarize", upload.single("audio"), async (req, res) => {
   try {
     if (!req.file) {
-      return res
-        .status(400)
-        .json({ summary: "Hata: Dosya sunucuya ulaşmadı." });
+      return res.status(400).json({ summary: "Hata: Dosya yok." });
     }
 
-    console.log("📩 Dosya alındı! Boyut:", req.file.size, "byte");
-    console.log("📂 Gelen Dosya Tipi:", req.file.mimetype); 
+    console.log("📩 Dosya alındı! Boyut:", req.file.size);
 
-    // DÜZELTME 1: Modeli 1.5 Flash yaptık (Kotaya takılmamak için)
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    // Dosya tipini algıla
-    let mimeType = req.file.mimetype;
+    // API Anahtarını kontrol et
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("API Anahtarı bulunamadı (Environment Variable eksik).");
+    }
+
+    // Dosyayı Base64 formatına çevir
+    const base64Data = req.file.buffer.toString("base64");
     
-    // DÜZELTME 2: Telefondan 'octet-stream' gelirse bunu SES dosyası olarak kabul et
-    if (mimeType === "application/octet-stream") {
-        console.log("⚠️ Tanımsız dosya tipi algılandı, ses dosyası (audio/mp3) varsayılıyor.");
-        mimeType = "audio/mpeg"; // Ses uygulaması olduğu için mp3 varsayıyoruz
-    }
+    // Ses dosyası (MP3) varsayıyoruz
+    const mimeType = "audio/mp3";
 
-    const filePart = {
-      inlineData: {
-        data: req.file.buffer.toString("base64"),
-        mimeType: mimeType, 
+    console.log("🚀 Google'a direkt bağlanılıyor...");
+
+    // Kütüphane YOK! Direkt Google adresine istek atıyoruz.
+    // Modeli 1.5 Flash seçtik.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
       },
-    };
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: "Bu ses kaydını dinle ve konuşulanları Türkçe olarak detaylıca özetle." },
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: base64Data
+              }
+            }
+          ]
+        }]
+      })
+    });
 
-    console.log(`🤖 Google Yapay Zekaya (${mimeType}) olarak gönderiliyor...`);
+    const data = await response.json();
 
-    // İstek metnini ayarla
-    let prompt = "Bu ses kaydını dinle. Konuşulanları Türkçe olarak özetle.";
-    
-    // Eğer olur da PDF gelirse diye promptu esnek tutalım
-    if (mimeType === "application/pdf") {
-        prompt = "Bu dosyayı incele ve içeriğini Türkçe olarak özetle.";
+    // Google hata mesajı döndürdüyse yakalayalım
+    if (data.error) {
+      console.error("Google Hatası:", JSON.stringify(data.error, null, 2));
+      return res.status(500).json({ 
+        summary: `Google Hatası: ${data.error.message}` 
+      });
     }
 
-    const result = await model.generateContent([prompt, filePart]);
-    const response = await result.response;
-    const text = response.text();
-
-    console.log("✅ Özet başarıyla oluşturuldu!");
-    res.json({ summary: text });
+    // Cevabı al
+    const summaryText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (summaryText) {
+      console.log("✅ Özet başarıyla alındı!");
+      res.json({ summary: summaryText });
+    } else {
+      console.log("⚠️ Cevap boş geldi:", data);
+      res.json({ summary: "Özet oluşturulamadı, ses çok kısa veya anlaşılmaz olabilir." });
+    }
 
   } catch (error) {
-    console.error("❌ HATA OLUŞTU:", error);
-    
-    // Hatayı detaylı görelim
-    let errorMessage = "Sunucu Hatası";
-    if (error.response && error.response.promptFeedback) {
-        errorMessage = "Yapay zeka güvenliği nedeniyle yanıt veremedi.";
-    } else if (error.message) {
-        errorMessage = error.message;
-    }
-
-    res.status(500).json({
-      summary: `Hata: ${errorMessage}`,
-    });
+    console.error("❌ Sunucu Hatası:", error);
+    res.status(500).json({ summary: `Sunucu Hatası: ${error.message}` });
   }
 });
 
 const PORT = 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Mutfak (Sunucu) Hazır: http://localhost:${PORT}`);
+  console.log(`🚀 Sunucu Hazır (Manuel Mod): http://localhost:${PORT}`);
 });
-
-
-
-
-
