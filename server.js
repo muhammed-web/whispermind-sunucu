@@ -15,8 +15,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // Google AI Bağlantısı
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Dosya yükleme alanı adını "file" olarak genelleyelim veya "audio" kalsın
-// (Flutter tarafında gönderirken 'audio' key'ini kullanıyorsan burası 'audio' kalmalı)
+// Dosya yükleme alanı
 app.post("/summarize", upload.single("audio"), async (req, res) => {
   try {
     if (!req.file) {
@@ -26,21 +25,18 @@ app.post("/summarize", upload.single("audio"), async (req, res) => {
     }
 
     console.log("📩 Dosya alındı! Boyut:", req.file.size, "byte");
-    console.log("📂 Dosya Tipi:", req.file.mimetype); // Loglarda tipi görelim
+    console.log("📂 Gelen Dosya Tipi:", req.file.mimetype); 
 
-    // Modeli seç (Gemini 1.5 Flash - Ücretsiz ve Hızlı)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    // DÜZELTME 1: Modeli 1.5 Flash yaptık (Kotaya takılmamak için)
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Dosya tipini (PDF mi Ses mi?) otomatik algıla
-    // Eğer Flutter doğru mimetype göndermiyorsa varsayılanı ayarla
+    // Dosya tipini algıla
     let mimeType = req.file.mimetype;
     
-    // Bazen mobilden gelen dosyalarda mimetype boş olabilir, kontrol edelim:
+    // DÜZELTME 2: Telefondan 'octet-stream' gelirse bunu SES dosyası olarak kabul et
     if (mimeType === "application/octet-stream") {
-        // Dosya uzantısına bakarak tahmin etmeye çalışabiliriz ama
-        // şimdilik varsayılan olarak PDF deneyelim (veya mp4)
-        // Senin durumunda PDF ağırlıklıysa:
-        mimeType = "application/pdf"; 
+        console.log("⚠️ Tanımsız dosya tipi algılandı, ses dosyası (audio/mp3) varsayılıyor.");
+        mimeType = "audio/mpeg"; // Ses uygulaması olduğu için mp3 varsayıyoruz
     }
 
     const filePart = {
@@ -50,13 +46,14 @@ app.post("/summarize", upload.single("audio"), async (req, res) => {
       },
     };
 
-    console.log(`🤖 Google Yapay Zekaya (${mimeType}) gönderiliyor...`);
+    console.log(`🤖 Google Yapay Zekaya (${mimeType}) olarak gönderiliyor...`);
 
-    // İstek metnini dosya türüne göre ayarla
-    let prompt = "Bu dosyayı incele ve içeriğini Türkçe olarak özetle.";
+    // İstek metnini ayarla
+    let prompt = "Bu ses kaydını dinle. Konuşulanları Türkçe olarak özetle.";
     
-    if (mimeType.startsWith("audio")) {
-        prompt = "Bu ses kaydını dinle. Konuşulanları Türkçe olarak özetle.";
+    // Eğer olur da PDF gelirse diye promptu esnek tutalım
+    if (mimeType === "application/pdf") {
+        prompt = "Bu dosyayı incele ve içeriğini Türkçe olarak özetle.";
     }
 
     const result = await model.generateContent([prompt, filePart]);
@@ -65,10 +62,20 @@ app.post("/summarize", upload.single("audio"), async (req, res) => {
 
     console.log("✅ Özet başarıyla oluşturuldu!");
     res.json({ summary: text });
+
   } catch (error) {
     console.error("❌ HATA OLUŞTU:", error);
+    
+    // Hatayı detaylı görelim
+    let errorMessage = "Sunucu Hatası";
+    if (error.response && error.response.promptFeedback) {
+        errorMessage = "Yapay zeka güvenliği nedeniyle yanıt veremedi.";
+    } else if (error.message) {
+        errorMessage = error.message;
+    }
+
     res.status(500).json({
-      summary: `Sunucu Hatası: ${error.message || error}`,
+      summary: `Hata: ${errorMessage}`,
     });
   }
 });
@@ -77,4 +84,3 @@ const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Mutfak (Sunucu) Hazır: http://localhost:${PORT}`);
 });
-
