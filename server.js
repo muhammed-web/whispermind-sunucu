@@ -28,7 +28,7 @@ app.post("/summarize", upload.single("audio"), async (req, res) => {
     console.log("📂 Gelen Dosya Tipi:", req.file.mimetype); 
 
     // DÜZELTME 1: Modeli 1.5 Flash yaptık (Kotaya takılmamak için)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
 
     // Dosya tipini algıla
     let mimeType = req.file.mimetype;
@@ -84,3 +84,4 @@ const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Mutfak (Sunucu) Hazır: http://localhost:${PORT}`);
 });
+
