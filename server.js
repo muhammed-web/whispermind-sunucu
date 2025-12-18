@@ -8,10 +8,9 @@ dotenv.config();
 const app = express();
 app.use(cors());
 
-// Dosyaları hafızada tut
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 1. TEŞHİS ROTASI (Test için kalsın, zararı yok)
+// 1. TEŞHİS ROTASI
 app.get("/test", async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
     try {
@@ -24,21 +23,21 @@ app.get("/test", async (req, res) => {
     }
 });
 
-// 2. ANA ROTA: Ses Özeti
+// 2. ANA ROTA
 app.post("/summarize", upload.single("audio"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ summary: "Hata: Dosya yok." });
     
-    console.log("📩 Dosya geldi! Boyut:", req.file.size);
+    console.log("📩 Dosya geldi:", req.file.size);
     const apiKey = process.env.GEMINI_API_KEY;
     const base64Data = req.file.buffer.toString("base64");
 
-    // İŞTE ÇÖZÜM BURADA: Listende var olan modeli seçtik!
+    // İŞTE SİHİRLİ ANAHTAR BURASI
+    // "gemini-flash-latest" demek: "Google, elindeki en çalışan Flash modelini ver" demek.
     const modelName = "gemini-flash-latest"; 
     
     console.log(`🚀 ${modelName} modeline bağlanılıyor...`);
 
-    // Kütüphanesiz, direkt istek (En garantisi)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
@@ -47,11 +46,10 @@ app.post("/summarize", upload.single("audio"), async (req, res) => {
       body: JSON.stringify({
         contents: [{
           parts: [{
-              text: "Bu ses kaydını dinle ve konuşulanları Türkçe olarak detaylıca özetle."
+              text: "Bu ses kaydını dinle ve konuşulanları Türkçe olarak özetle."
             }, {
               inlineData: {
-                // Telefondan bazen octet-stream geliyor, mp3 varsayıyoruz
-                mimeType: "audio/mp3", 
+                mimeType: "audio/mp3",
                 data: base64Data
               }
             }]
@@ -61,22 +59,13 @@ app.post("/summarize", upload.single("audio"), async (req, res) => {
 
     const data = await response.json();
 
-    // Hata kontrolü
     if (data.error) {
       console.error("Google Hatası:", JSON.stringify(data.error, null, 2));
       return res.status(500).json({ summary: `Google Hatası: ${data.error.message}` });
     }
 
-    // Cevabı al
     const summaryText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (summaryText) {
-      console.log("✅ Özet başarıyla alındı!");
-      res.json({ summary: summaryText });
-    } else {
-      console.log("⚠️ Cevap boş geldi:", data);
-      res.json({ summary: "Özet oluşturulamadı, ses anlaşılamadı." });
-    }
+    res.json({ summary: summaryText || "Özet boş geldi." });
 
   } catch (error) {
     console.error("Sunucu Hatası:", error);
@@ -88,4 +77,3 @@ const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Sunucu Hazır: http://localhost:${PORT}`);
 });
-
