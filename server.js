@@ -8,6 +8,7 @@ dotenv.config();
 const app = express();
 app.use(cors());
 
+// Dosyaları hafızada tut
 const upload = multer({ storage: multer.memoryStorage() });
 
 // 1. TEŞHİS ROTASI
@@ -23,20 +24,37 @@ app.get("/test", async (req, res) => {
     }
 });
 
-// 2. ANA ROTA
+// 2. ANA ROTA: Ses Özeti
+// upload.single("audio") -> Sadece ses dosyasını alır
+// req.body -> Diğer metin verilerini (dil seçimi vb.) alır
 app.post("/summarize", upload.single("audio"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ summary: "Hata: Dosya yok." });
     
-    console.log("📩 Dosya geldi:", req.file.size);
+    // Telefondan gelen dil kodunu al (yoksa varsayılan Türkçe olsun)
+    // Örn: "en", "de", "fr"
+    const userLanguage = req.body.language || "tr";
+
+    console.log(`📩 Dosya geldi! Boyut: ${req.file.size} - İstenen Dil: ${userLanguage}`);
+    
     const apiKey = process.env.GEMINI_API_KEY;
     const base64Data = req.file.buffer.toString("base64");
-
-    // İŞTE SİHİRLİ ANAHTAR BURASI
-    // "gemini-flash-latest" demek: "Google, elindeki en çalışan Flash modelini ver" demek.
     const modelName = "gemini-flash-latest"; 
-    
-    console.log(`🚀 ${modelName} modeline bağlanılıyor...`);
+
+    // İŞTE SİHİR BURADA: Promptu dile göre dinamik yapıyoruz
+    // Diller için basit bir sözlük
+    const prompts = {
+        "tr": "Bu ses kaydını dinle ve konuşulanları Türkçe olarak detaylıca özetle. Başlıklar ve maddeler kullan.",
+        "en": "Listen to this audio and summarize the spoken content in English in detail. Use headings and bullet points.",
+        "de": "Hören Sie sich diese Audioaufnahme an und fassen Sie den gesprochenen Inhalt ausführlich auf Deutsch zusammen. Verwenden Sie Überschriften und Aufzählungszeichen.",
+        "es": "Escucha este audio y resume el contenido hablado en español detalladamente. Usa encabezados y viñetas.",
+        "fr": "Écoutez cet enregistrement audio et résumez le contenu parlé en français en détail. Utilisez des titres et des puces.",
+        "ru": "Прослушайте эту аудиозапись и подробно перескажите содержание на русском языке. Используйте заголовки и пункты.",
+        "ar": "استمع إلى هذا التسجيل الصوتي ولخص المحتوى المنطوق باللغة العربية بالتفصيل. استخدم العناوين والنقاط."
+    };
+
+    // Eğer bilinmeyen bir dil gelirse İngilizce yap
+    const selectedPrompt = prompts[userLanguage] || prompts["en"];
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
@@ -46,7 +64,7 @@ app.post("/summarize", upload.single("audio"), async (req, res) => {
       body: JSON.stringify({
         contents: [{
           parts: [{
-              text: "Bu ses kaydını dinle ve konuşulanları Türkçe olarak özetle."
+              text: selectedPrompt 
             }, {
               inlineData: {
                 mimeType: "audio/mp3",
